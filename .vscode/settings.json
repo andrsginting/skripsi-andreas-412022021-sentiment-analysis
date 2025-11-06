@@ -1,0 +1,8 @@
+{
+    "python.defaultInterpreterPath": "D:\\SKRIPSI\\EXPERIMENT\\SCRAPPING YT\\venv_skripsi\\Scripts\\python.exe",
+    "python.analysis.extraPaths": [
+        "D:\\SKRIPSI\\EXPERIMENT\\SCRAPPING YT\\venv_skripsi\\Lib\\site-packages"
+    ],
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.indexing": true
+}
