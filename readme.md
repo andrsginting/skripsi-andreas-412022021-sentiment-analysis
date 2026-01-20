@@ -1,29 +1,47 @@
+# TUGAS AKHIR
+## ANALISIS SENTIMEN PUBLIK TERHADAP PAPARAN MENTERI KEUANGAN RI PERIODE 2025–2029  
+## PADA KOMENTAR YOUTUBE MENGGUNAKAN INDOBERT DAN PEMBOBOTAN LIKES
 
-# Sentiment Analysis YouTube Comments using IndoBERT and LLM as a Judge
-
-Repository ini berisi implementasi lengkap pipeline **scraping komentar YouTube**, **analisis sentimen berbasis IndoBERT**, serta **evaluasi model menggunakan pendekatan LLM as a Judge (GPT-4o-mini)** pada level komentar dan thread.  
-Proyek ini dikembangkan sebagai bagian dari penelitian skripsi.
-
----
-
-## 📌 Alur Umum Pipeline
-
-1. Scraping komentar YouTube (multi-video)
-2. Statistik hasil scraping
-3. Pembersihan data (cleaning)
-4. Analisis panjang komentar
-5. Sentiment inference menggunakan IndoBERT
-6. Penyesuaian sentimen berbasis konteks (contextual adjustment)
-7. Agregasi sentimen level thread
-8. Ringkasan sentimen per video
-9. Visualisasi distribusi sentimen
-10. Anotasi sentimen menggunakan LLM (GPT-4o-mini)
-11. Evaluasi IndoBERT vs LLM (comment-level & thread-level)
-12. Confusion matrix dan analisis error
+**Nama:** Andreas Nicolas Ginting  
+**NIM:** 412022021  
 
 ---
 
-## 🧰 Persiapan Awal
+## 📘 Deskripsi Proyek
+Repository ini berisi implementasi lengkap pipeline **analisis sentimen komentar YouTube** untuk mendukung penelitian tugas akhir.  
+Pendekatan utama yang digunakan adalah:
+
+- **IndoBERT** sebagai model analisis sentimen berbasis Transformer
+- **Pembobotan likes** untuk merepresentasikan pengaruh opini
+- **Agregasi sentimen berbasis thread diskusi**
+- **Large Language Model (GPT-4o-mini) sebagai ground truth (LLM as a Judge)**
+
+Pipeline dirancang **end-to-end**, mulai dari scraping data mentah hingga evaluasi model secara kuantitatif dan visual.
+
+---
+
+## 📁 Struktur Direktori Utama
+```
+
+├── scrapping/                     # Scraping komentar YouTube
+├── cleaning/                      # Pembersihan dan preprocessing data
+├── sentiment/                     # Inferensi sentimen IndoBERT
+├── weighted_average_summary/      # Ringkasan sentimen level video
+├── llm_judge/                     # Ground truth comment-level (LLM)
+├── new_llm_judge/                 # Ground truth thread-level (LLM)
+├── evaluation/                    # Evaluasi IndoBERT vs LLM (comment-level)
+├── new_evaluation/                # Evaluasi IndoBERT vs LLM (thread-level)
+├── run_scraper.py
+├── run_comment_statistics.py
+├── run_cleaning.py
+├── run_count_words.py
+└── requirements.txt
+
+````
+
+---
+
+## ⚙️ Persiapan Awal
 
 ### 1️⃣ Clone Repository
 ```bash
@@ -31,322 +49,332 @@ git clone https://github.com/andrsginting/skripsi-andreas-412022021-sentiment-an
 cd skripsi-andreas-412022021-sentiment-analysis
 ````
 
-### 2️⃣ Install Dependencies
+### 2️⃣ (Opsional) Virtual Environment
 
-Disarankan menggunakan virtual environment.
+```bash
+python -m venv venv
+source venv/bin/activate      # Mac/Linux
+venv\Scripts\activate         # Windows
+```
+
+### 3️⃣ Install Dependensi
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3️⃣ Setup Environment Variable (LLM Judge)
+### 4️⃣ Konfigurasi API Key (WAJIB untuk LLM Judge)
 
-Buat file `.env`:
+Buat file `.env` di root project:
 
-```env
-OPENAI_API_KEY=your_openai_api_key_here
+```
+OPENAI_API_KEY=YOUR_API_KEY
 ```
 
 ---
 
-## 🚀 Langkah Eksekusi Pipeline (Step-by-Step)
+## 🚀 Alur Eksekusi Pipeline (STEP-BY-STEP DETAIL)
 
 ---
 
-## 1. Scraping Komentar YouTube
+## STEP 1 — Scraping Komentar YouTube
 
 **File:** `run_scraper.py`
 
-**Tujuan:**
-Mengambil komentar dan balasan dari hingga 6 video YouTube.
+### Proses:
 
-**Perintah:**
+* Mengambil komentar utama dan balasan (reply) dari maksimal **6 video YouTube**
+* Setiap komentar dikaitkan dengan `thread_id`
+* Menyimpan jumlah likes dan status reply
+* Mendukung mode **browser terlihat** atau **headless**
 
 ```bash
 python run_scraper.py
 ```
 
-**Input:**
+### Output:
 
-* URL video YouTube
-* Mode browser (visible / headless)
+* Folder: `scrapping/dataset/`
+* File: `dataset_video_X.csv`
+* Kolom utama:
 
-**Output:**
-
-```
-scrapping/dataset/
-└── dataset_video_X.csv
-```
+  * `thread_id`
+  * `comment`
+  * `likes_count`
+  * `is_reply`
 
 ---
 
-## 2. Statistik Hasil Scraping
+## STEP 2 — Statistik Dasar Komentar
 
 **File:** `run_comment_statistics.py`
 
-**Tujuan:**
-Menghasilkan statistik dasar komentar (jumlah komentar, likes, reply, dll).
+### Proses:
 
-**Perintah:**
+* Menghitung jumlah komentar total
+* Memisahkan komentar utama dan reply
+* Menghitung total dan rata-rata likes
+* Mengidentifikasi komentar dengan likes tertinggi
 
 ```bash
 python run_comment_statistics.py
 ```
 
-**Output:**
+### Output:
 
-```
-statistics/comment_scraping_stats/
-├── comment_scraping_summary.csv
-└── dataset_video_X_details.csv
-```
+* `statistics/comment_scraping_stats/comment_scraping_summary.csv`
+* File detail per video
 
 ---
 
-## 3. Cleaning Dataset
+## STEP 3 — Cleaning & Preprocessing Data
 
 **File:** `run_cleaning.py`
 
-**Tujuan:**
-Membersihkan teks komentar (normalisasi, hapus noise, dll).
+### Proses:
 
-**Perintah:**
+* Lowercasing
+* Menghapus URL, emoji, simbol
+* Normalisasi teks
+* Menghasilkan kolom `cleaned_comment`
 
 ```bash
 python run_cleaning.py
 ```
 
-**Output:**
+### Output:
 
-```
-cleaning/dataset/
-└── dataset_video_X_cleaned.csv
-```
+* Folder: `cleaning/dataset/`
+* File: `*_cleaned.csv`
 
 ---
 
-## 4. Analisis Jumlah Kata
+## STEP 4 — Analisis Panjang Komentar
 
 **File:** `run_count_words.py`
 
-**Tujuan:**
-Menghitung panjang komentar sebagai analisis karakteristik data.
+### Proses:
 
-**Perintah:**
+* Menghitung jumlah kata per komentar
+* Menghasilkan statistik rata-rata panjang komentar
 
 ```bash
 python run_count_words.py
 ```
 
-**Output:**
+### Output:
 
-```
-dataset_count_word/
-├── count_words_dataset_video_X.csv
-├── summary_avg_words_per_file.csv
-└── summary_global_avg_words.csv
-```
+* Folder: `dataset_count_word/`
+* File ringkasan global & per video
 
 ---
 
-## 5. Sentiment Inference (IndoBERT)
+## STEP 5 — Inferensi Sentimen Menggunakan IndoBERT
 
 **File:** `sentiment/runners/run_sentiment_inference.py`
 
-**Tujuan:**
-Melakukan klasifikasi sentimen komentar menggunakan IndoBERT.
+### Proses:
 
-**Perintah:**
+* Melakukan klasifikasi sentimen pada setiap komentar
+* Model: `mdhugol/indonesia-bert-sentiment-classification`
+* Label: `positive`, `neutral`, `negative`
 
 ```bash
 python sentiment/runners/run_sentiment_inference.py
 ```
 
-**Model:**
+### Output:
 
-```
-mdhugol/indonesia-bert-sentiment-classification
-```
-
-**Output:**
-
-```
-sentiment/dataset/sentiment/
-└── dataset_video_X_sentiment.csv
-```
+* Folder: `sentiment/dataset/sentiment/`
+* File: `*_sentiment.csv`
+* Kolom: `predicted_label`, `confidence_score`
 
 ---
 
-## 6. Contextual Adjustment
+## STEP 6 — Contextual Sentiment Adjustment
 
 **File:** `sentiment/runners/run_contextual_adjustment.py`
 
-**Tujuan:**
-Menggabungkan sentimen komentar utama dan balasan dengan bobot berbeda (60/40, 70/30, 80/20).
+### Proses:
 
-**Perintah:**
+* Menyesuaikan sentimen komentar berdasarkan konteks reply dan main comment
+* Eksperimen bobot:
+
+  * 60% main – 40% reply
+  * 70% main – 30% reply
+  * 80% main – 20% reply
 
 ```bash
 python sentiment/runners/run_contextual_adjustment.py
 ```
 
-**Output:**
+### Output:
 
-```
-sentiment/dataset/contextual/
-├── 60_main_sentiment/
-├── 70_main_sentiment/
-└── 80_main_sentiment/
-```
+* Folder: `sentiment/dataset/contextual/{experiment}/`
+* File: `*_contextual.csv`
 
 ---
 
-## 7. Agregasi Thread-Level
+## STEP 7 — Agregasi Sentimen Level Thread
 
 **File:** `sentiment/runners/run_thread_aggregation.py`
 
-**Tujuan:**
-Menghasilkan satu skor sentimen untuk setiap thread diskusi.
+### Proses:
 
-**Perintah:**
+* Menggabungkan sentimen komentar dalam satu thread
+* Menghasilkan skor sentimen berbobot likes
 
 ```bash
 python sentiment/runners/run_thread_aggregation.py
 ```
 
-**Output:**
+### Output:
 
-```
-sentiment/dataset/summary/{experiment}/
-└── dataset_video_X_cleaned_summary.csv
-```
+* Folder: `sentiment/dataset/summary/{experiment}/`
+* File: `*_cleaned_summary.csv`
 
 ---
 
-## 8. Ringkasan Sentimen per Video
+## STEP 8 — Ringkasan Sentimen Level Video
 
 **File:** `weighted_average_summary/video_sentiment_summary.py`
 
-**Tujuan:**
-Menghasilkan distribusi sentimen per video.
+### Proses:
 
-**Perintah:**
+* Menghitung proporsi sentimen positif, netral, negatif per video
+* Berdasarkan agregasi thread
 
 ```bash
 python weighted_average_summary/video_sentiment_summary.py
 ```
 
-**Output:**
+### Output:
 
-```
-weighted_average_summary/{experiment}/video_sentiment_overview.csv
-```
+* `video_sentiment_overview.csv`
 
 ---
 
-## 9. Visualisasi Sentimen
+## STEP 9 — Visualisasi Sentimen
 
 **File:** `weighted_average_summary/generate_sentiment_charts.py`
 
-**Tujuan:**
-Membuat bar chart dan pie chart sentimen.
+### Proses:
 
-**Perintah:**
+* Membuat bar chart per video
+* Membuat pie chart keseluruhan
 
 ```bash
 python weighted_average_summary/generate_sentiment_charts.py
 ```
 
-**Output:**
+### Output:
 
-```
-bar_chart_sentiment_per_video.png
-pie_chart_overall_sentiment.png
-```
+* File PNG (bar chart & pie chart)
 
 ---
 
-## 10. LLM as a Judge – Comment Level
+## 🤖 Ground Truth Menggunakan LLM (GPT-4o-mini)
+
+## STEP 10 — LLM Judge (Comment-Level)
 
 **File:** `llm_judge/runners/run_llm_judge.py`
 
-**Tujuan:**
-Menghasilkan label sentimen ground truth menggunakan GPT-4o-mini.
+### Proses:
 
-**Perintah:**
+* Memberi label sentimen komentar sebagai ground truth
+* Menggunakan prompt terkontrol
 
 ```bash
 python llm_judge/runners/run_llm_judge.py
 ```
 
-**Output:**
+### Output:
 
-```
-llm_judge/output/
-└── dataset_video_X_llm.csv
-```
+* `llm_judge/output/*_llm.csv`
 
 ---
 
-## 11. Evaluasi IndoBERT vs LLM (Comment Level)
+## STEP 11 — Analisis Distribusi Label LLM
 
-**File:** `evaluation/run_evaluate_indobert_vs_llm.py`
+```bash
+python llm_judge/analyze_sentiment_distribution.py
+```
 
-**Tujuan:**
-Menghitung Accuracy, Precision, Recall, dan F1-Score.
+### Output:
 
-**Perintah:**
+* Statistik dan visualisasi distribusi sentimen comment-level
+
+---
+
+## STEP 12 — Ground Truth Thread-Level (LLM)
+
+```bash
+python new_llm_judge/thread_evaluation/builders/build_thread_json.py
+python new_llm_judge/thread_evaluation/runners/run_thread_judge.py
+python new_llm_judge/thread_evaluation/runners/run_distribution_labels_thread.py
+```
+
+### Output:
+
+* Label sentimen thread-level
+* Visualisasi distribusi thread
+
+---
+
+## 📊 Evaluasi Model IndoBERT
+
+## STEP 13 — Evaluasi Comment-Level
 
 ```bash
 python evaluation/run_evaluate_indobert_vs_llm.py
 ```
 
-**Output:**
+### Output:
 
-```
-evaluation/results/
-├── summary_per_video.csv
-├── overall_classification_report.txt
-└── dataset_video_X_classification_report.txt
-```
+* Accuracy, Precision, Recall, F1-score
+* Classification report per video & keseluruhan
 
 ---
 
-## 12. Confusion Matrix
-
-**File:** `evaluation/generate_confusion_matrix.py`
-
-**Tujuan:**
-Visualisasi kesalahan klasifikasi IndoBERT terhadap LLM.
-
-**Perintah:**
+## STEP 14 — Confusion Matrix Comment-Level
 
 ```bash
 python evaluation/generate_confusion_matrix.py
 ```
 
-**Output:**
+### Output:
 
-```
-evaluation/results/
-├── *_confusion_matrix.png
-├── *_confusion_matrix_normalized.png
-└── confusion_matrix_summary.txt
-```
+* Confusion matrix (count & normalized)
+* File PNG dan TXT
 
 ---
 
-## 🧠 Catatan Penting
+## STEP 15 — Evaluasi Thread-Level (Final)
 
-* Pipeline **harus dijalankan berurutan**
-* LLM Judge membutuhkan **API Key OpenAI**
-* Waktu eksekusi LLM bergantung pada jumlah komentar
+```bash
+python new_evaluation/thread_evaluation/runners/run_thread_evaluation.py
+python new_evaluation/thread_evaluation/runners/run_confusion_matrix_per_video.py
+```
+
+### Output:
+
+* Evaluasi performa IndoBERT pada level thread
+* Confusion matrix per eksperimen
 
 ---
 
-## 📜 Lisensi
+## 🧠 Catatan Akademik
 
-Proyek ini dikembangkan untuk keperluan akademik (skripsi).
-Penggunaan ulang diperbolehkan dengan mencantumkan sumber.
+Pipeline ini dirancang untuk:
+
+* Mendukung validitas penelitian skripsi
+* Memungkinkan replikasi eksperimen
+* Membandingkan model ML dengan LLM sebagai ground truth
+
+---
+
+## 📄 Lisensi
+
+Proyek ini dibuat untuk keperluan akademik dan penelitian tugas akhir.
 
 
