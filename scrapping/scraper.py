@@ -162,75 +162,111 @@ def _continuous_scroll_until_stable(driver, max_scrolls=MAX_GLOBAL_SCROLLS, stab
 # ==========================================================
 # Deep Recursive Reply Expansion
 # ==========================================================
-def expand_replies_recursively(thread, driver, csv_writer, processed_hash, depth=0, max_depth=50):
+def expand_replies_recursive_v2(thread, driver, csv_writer, processed_hash, thread_id, depth=1, max_depth=5, max_time_per_thread=60):
     """
-    Rekursif membuka semua 'Show more replies' dan 'Read more' di balasan komentar.
-    Kini kompatibel dengan struktur baru (2025) dan lama.
+    Versi paling stabil untuk ekspansi balasan komentar YouTube (nested safe).
+    - Mengklik semua "View replies" & "Show more replies" hingga habis.
+    - Menggunakan recursive depth control.
+    - Cocok untuk headless mode.
     """
-    if depth > max_depth:
-        print(f"[DEBUG] Depth {depth} melebihi batas, hentikan rekursi.")
-        return
+    start_time = time.time()
+    prev_reply_count = -1
+    stagnant_rounds = 0
+    nested_level = depth
 
-    time.sleep(0.1 + random.random() * 0.05)
+    def wait_new_replies(old_count, timeout=6):
+        """Tunggu hingga jumlah reply bertambah, atau timeout."""
+        for _ in range(int(timeout * 2)):  # per 0.5 detik
+            cur = len(thread.find_elements(By.XPATH, ".//ytd-comment-view-model"))
+            if cur > old_count:
+                return cur
+            time.sleep(0.5)
+        return old_count
 
-    # Ambil semua balasan di dalam thread
-    replies = thread.find_elements(By.XPATH, ".//ytd-comment-replies-renderer//ytd-comment-view-model")
+    while True:
+        if time.time() - start_time > max_time_per_thread:
+            print(f"[TIMEOUT] Thread {thread_id[:8]} melebihi {max_time_per_thread}s.")
+            break
 
-    # Buka 'Read more' di tiap balasan
-    for r in replies:
-        read_btns = r.find_elements(By.XPATH, ".//tp-yt-paper-button[@id='more']")
-        for btn in read_btns:
+        # Cari semua tombol View/Show more replies
+        buttons = thread.find_elements(By.XPATH, 
+            ".//ytd-button-renderer[@id='more-replies']//button | "
+            ".//ytd-button-renderer[@id='more-replies-sub-thread']//button | "
+            ".//ytd-continuation-item-renderer//button[contains(., 'Show more replies')] | "
+            ".//tp-yt-paper-button[@id='more-replies']"
+        )
+        buttons = [b for b in buttons if b.is_displayed() and b.is_enabled()]
+
+        if not buttons:
+            stagnant_rounds += 1
+        else:
+            stagnant_rounds = 0
+
+        if stagnant_rounds >= 5:
+            break
+
+        any_clicked = False
+        for btn in buttons:
             try:
                 driver.execute_script("arguments[0].scrollIntoView({block:'center'});", btn)
-                if safe_click(driver, btn):
-                    time.sleep(0.08 + random.random() * 0.05)
+                time.sleep(random.uniform(0.25, 0.45))
+                safe_click(driver, btn)
+                any_clicked = True
+                print(f"[DEBUG] Klik tombol 'Show more replies' di depth={nested_level}...")
+
+                prev_reply_count = wait_new_replies(prev_reply_count, timeout=8)
+                time.sleep(random.uniform(0.4, 0.8))
             except Exception:
                 continue
 
-        # Simpan komentar balasan ke CSV
-        try:
-            r_element = r.find_element(By.ID, "content-text")
-            r_text = clean_comment_text_preserve(extract_comment_richtext(r_element))
-            r_likes_text = ""
+        # Jika tidak ada klik tapi tombol masih ada, beri kesempatan terakhir
+        if not any_clicked:
+            time.sleep(random.uniform(0.7, 1.0))
+
+        # Stop bila tidak ada balasan baru >10 detik
+        cur_count = len(thread.find_elements(By.XPATH, ".//ytd-comment-view-model"))
+        if cur_count == prev_reply_count:
+            stagnant_rounds += 1
+        else:
+            prev_reply_count = cur_count
+            stagnant_rounds = 0
+
+        if time.time() - start_time > max_time_per_thread or stagnant_rounds >= 5:
+            break
+
+    # === Setelah semua terbuka, ambil semua balasan ===
+    try:
+        replies = thread.find_elements(By.XPATH, ".//ytd-comment-replies-renderer//ytd-comment-view-model")
+        for r in replies:
             try:
-                r_likes_text = r.find_element(By.ID, "vote-count-middle").text.strip()
+                for btn in r.find_elements(By.XPATH, ".//tp-yt-paper-button[@id='more']"):
+                    safe_click(driver, btn)
+                    time.sleep(0.05)
+
+                r_element = r.find_element(By.ID, "content-text")
+                r_text = clean_comment_text_preserve(extract_comment_richtext(r_element))
+                likes_text = ""
+                try:
+                    likes_text = r.find_element(By.ID, "vote-count-middle").text.strip()
+                except Exception:
+                    pass
+                r_likes = parse_numeric_text(likes_text)
+                r_cid = make_hash_id(r_text)
+
+                if r_cid not in processed_hash:
+                    csv_writer.writerow({
+                        "thread_id": thread_id,
+                        "comment": r_text,
+                        "likes_count": r_likes,
+                        "is_reply": True
+                    })
+                    processed_hash.add(r_cid)
             except Exception:
-                pass
-            r_likes = parse_numeric_text(r_likes_text)
-            r_cid = make_hash_id(r_text)
-            if r_cid not in processed_hash:
-                csv_writer.writerow({"comment": r_text, "likes_count": r_likes, "is_reply": True})
-                processed_hash.add(r_cid)
-        except Exception:
-            continue
+                continue
 
-    # Cari tombol "Show more replies" di struktur baru maupun lama
-    button_selectors = [
-        # Struktur baru 2025
-        ".//ytd-continuation-item-renderer//button[contains(., 'Show more replies')]",
-        # Struktur lama
-        ".//ytd-button-renderer[@id='more-replies' or @id='more-replies-sub-thread']//button",
-    ]
-    buttons = []
-    for sel in button_selectors:
-        buttons += thread.find_elements(By.XPATH, sel)
-
-    # Klik tombol jika ada
-    if not buttons:
-        return
-
-    for btn in buttons:
-        try:
-            driver.execute_script("arguments[0].scrollIntoView({block:'center'});", btn)
-            label = btn.get_attribute("aria-label") or btn.text
-            if any(k in label for k in ["Show more replies", "Tampilkan", "Lihat", "Mostrar"]):
-                if safe_click(driver, btn):
-                    print(f"[DEBUG] membuka 'Show more replies' (depth={depth})")
-                    time.sleep(0.3 + random.random() * 0.2)
-                    expand_replies_recursively(thread, driver, csv_writer, processed_hash, depth + 1)
-        except Exception:
-            continue
-
+        print(f"[THREAD] Total balasan terekstrak: {len(replies)} untuk thread {thread_id[:8]}")
+    except Exception as e:
+        print(f"[ERROR] Gagal membaca reply pada thread {thread_id[:8]}: {e}")
 
 
 # ==========================================================
@@ -259,7 +295,12 @@ def process_thread_fully(thread, driver, csv_writer, processed_hash):
         likes = parse_numeric_text(likes_text)
         cid = make_hash_id(main_text)
         if cid not in processed_hash:
-            csv_writer.writerow({"comment": main_text, "likes_count": likes, "is_reply": False})
+            csv_writer.writerow({
+                "thread_id": cid,  # gunakan hash komentar utama sebagai thread_id unik
+                "comment": main_text,
+                "likes_count": likes,
+                "is_reply": False
+            })
             processed_hash.add(cid)
     except Exception:
         return
@@ -272,7 +313,7 @@ def process_thread_fully(thread, driver, csv_writer, processed_hash):
 
     # Jalankan recursive expansion untuk memastikan semua balasan habis
     time.sleep(0.3)
-    expand_replies_recursively(thread, driver, csv_writer, processed_hash, depth=1)
+    expand_replies_recursive_v2(thread, driver, csv_writer, processed_hash, thread_id=cid, depth=1)
 
 
 # ==========================================================
@@ -285,7 +326,7 @@ def scrape_in_batches(driver, batch_size, csv_path):
     n_batches = (total_threads + batch_size - 1) // batch_size
 
     f = open(csv_path, "w", newline="", encoding="utf-8-sig")
-    writer = csv.DictWriter(f, fieldnames=["comment", "likes_count", "is_reply"], quoting=csv.QUOTE_MINIMAL)
+    writer = csv.DictWriter(f, fieldnames=["thread_id", "comment", "likes_count", "is_reply"], quoting=csv.QUOTE_MINIMAL)
     writer.writeheader()
 
     processed_hash = set()

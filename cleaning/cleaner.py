@@ -14,6 +14,7 @@ def list_available_datasets():
     files.sort()
     return files
 
+
 def clean_dataset(file_name: str):
     """Membersihkan satu file dataset dan menyimpannya ke folder cleaning/dataset."""
     input_path = os.path.join(SCRAP_DATASET_DIR, file_name)
@@ -22,19 +23,28 @@ def clean_dataset(file_name: str):
 
     print(f"\n[PROCESS] Membersihkan file: {file_name}")
 
+    # === Baca dataset mentah ===
     try:
         df = pd.read_csv(input_path)
     except Exception as e:
         print(f"[ERROR] Gagal membaca file {file_name}: {e}")
         return
 
+    # === Validasi kolom wajib ===
     if "comment" not in df.columns or "likes_count" not in df.columns:
         print(f"[ERROR] Kolom 'comment' atau 'likes_count' tidak ditemukan pada {file_name}.")
         return
 
+    # === Siapkan kolom opsional agar tidak error ===
+    if "thread_id" not in df.columns:
+        df["thread_id"] = None
+    if "is_reply" not in df.columns:
+        df["is_reply"] = False
+
     success_count, fail_count = 0, 0
     cleaned_comments = []
 
+    # === Lakukan cleaning komentar ===
     for i, text in tqdm(enumerate(df["comment"].astype(str)), total=len(df), desc=f"Cleaning {file_name}", ncols=90):
         try:
             cleaned = clean_comment_pipeline(text)
@@ -47,27 +57,28 @@ def clean_dataset(file_name: str):
 
     df["cleaned_comment"] = cleaned_comments
 
-    # ========== Tahap Filter Kosongan ==========
-    # deteksi penyebab kosong
+    # === Deteksi komentar kosong ===
     df["empty_reason"] = df.apply(
         lambda x: detect_empty_reason(x["comment"]) if not str(x["cleaned_comment"]).strip() else None,
         axis=1
     )
 
-    # hitung statistik sebelum hapus
+    # === Hitung statistik kosong ===
     empty_rows = df[df["cleaned_comment"].astype(str).str.strip() == ""]
     count_emoji = (empty_rows["empty_reason"] == "emoji_saja").sum()
     count_punct = (empty_rows["empty_reason"] == "tanda_baca_saja").sum()
     count_other = (empty_rows["empty_reason"] == "lainnya").sum()
     total_deleted = len(empty_rows)
 
-    # hapus baris kosong
+    # === Hapus baris kosong ===
     df = df[df["cleaned_comment"].astype(str).str.strip() != ""]
 
-    # simpan hanya dua kolom final
+    # === Simpan hasil akhir dengan kolom penting ===
     cleaned_df = pd.DataFrame({
+        "thread_id": df["thread_id"],
         "cleaned_comment": df["cleaned_comment"],
-        "likes_count": df["likes_count"]
+        "likes_count": df["likes_count"],
+        "is_reply": df["is_reply"]
     })
 
     try:
@@ -75,7 +86,6 @@ def clean_dataset(file_name: str):
         print(f"[DONE] File selesai dibersihkan: {output_path}")
         print(f"[SUMMARY] Total baris: {len(df)} | Berhasil diproses: {success_count} | Gagal: {fail_count}")
 
-        # tampilkan info penghapusan
         print(f"[FILTER] Baris kosong dihapus: {total_deleted}")
         if total_deleted > 0:
             print(f" ├─ Hanya emoji: {count_emoji}")

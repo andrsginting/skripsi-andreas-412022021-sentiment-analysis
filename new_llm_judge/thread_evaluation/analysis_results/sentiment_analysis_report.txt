@@ -1,0 +1,24 @@
+
+THREAD-LEVEL SENTIMENT ANALYSIS REPORT
+============================================================
+
+Analysis Date: 2026-01-16 19:48:59
+Total Files Analyzed: 6
+Total Threads Analyzed: 6128
+
+SENTIMENT DISTRIBUTION:
+------------------------------------------------------------
+
+NEGATIF:
+  Count: 2852
+  Percentage: 46.54%
+
+NETRAL:
+  Count: 1439
+  Percentage: 23.48%
+
+POSITIF:
+  Count: 1837
+  Percentage: 29.98%
+
+============================================================

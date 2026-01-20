@@ -1,7 +1,23 @@
+# Scraping & Data
 selenium>=4.8.0
 webdriver-manager>=3.8.5
-pandas
+pandas>=1.5.0
 tqdm
 emoji
-transformers 
+
+# NLP & ML
+transformers
 torch
+scikit-learn
+numpy>=1.20.0
+matplotlib>=3.4.0
+seaborn
+
+# OpenAI & Env
+openai>=1.30.0
+python-dotenv
+
+# LangChain (LLM-as-a-Judge)
+langchain>=0.2.0
+langchain-openai>=0.1.7
+tenacity

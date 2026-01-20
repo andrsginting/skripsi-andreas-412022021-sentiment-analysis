@@ -1,2 +1,29 @@
-# Virtual environment
-venv_skripsi/
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data
+*.csv
+*.xlsx
+*json
+*.png
+
+# Model / Cache
+models/
+.cache/
+.huggingface/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+

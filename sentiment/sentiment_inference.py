@@ -78,37 +78,39 @@ def _resolve_pos_neg_indices(model):
 
 # Batch scoring function
 def compute_sentiment_scores(df, batch_size=64, model_name=None):
-    """
-    df: pandas DataFrame with at least column 'cleaned_comment'
-    returns df with an added 'sentiment_score' column (float [-1,1])
-    """
     tokenizer, model, device, id2label = load_model_and_tokenizer(model_name=model_name)
     pos_idx, neg_idx, neu_idx, label_names = _resolve_pos_neg_indices(model)
 
     texts = df["cleaned_comment"].fillna("").astype(str).tolist()
     scores = []
+    predicted_labels = []   # <-- tambahan
+
     model.eval()
 
     for i in tqdm(range(0, len(texts), batch_size), desc="Sentiment inference", ncols=80):
         batch_texts = texts[i:i + batch_size]
-        # tokenizer returns tensors on CPU; move to device after
         inputs = tokenizer(batch_texts, padding=True, truncation=True, max_length=256, return_tensors="pt")
         inputs = {k: v.to(device) for k, v in inputs.items()}
+
         with torch.no_grad():
             outputs = model(**inputs)
-            logits = outputs.logits  # shape (B, num_labels)
-            probs = softmax(logits, dim=-1).cpu().numpy()
+            logits = outputs.logits
+            probs_batch = softmax(logits, dim=-1).cpu().numpy()
 
-        for p in probs:
-            # ensure indexing exists
-            p_pos = float(p[pos_idx]) if pos_idx < len(p) else 0.0
-            p_neg = float(p[neg_idx]) if neg_idx < len(p) else 0.0
-            score = p_pos - p_neg
-            # clip to [-1,1]
-            scores.append(max(-1.0, min(1.0, score)))
+        for probs in probs_batch:
+            p_pos = float(probs[pos_idx])
+            p_neg = float(probs[neg_idx])
+            score = max(-1.0, min(1.0, p_pos - p_neg))
+
+            scores.append(score)
+
+            # label kategori
+            predicted_labels.append(_label_from_probabilities(probs, label_names))
 
     df = df.copy()
     df["sentiment_score"] = scores
+    df["predicted_label"] = predicted_labels   # <-- tambahan kolom
+
     return df
 
 
@@ -118,16 +120,19 @@ def analyze_and_save(csv_path, output_path, batch_size=64, model_name=None):
     if "cleaned_comment" not in df.columns:
         raise ValueError("Input CSV must contain 'cleaned_comment' column.")
     df_out = compute_sentiment_scores(df, batch_size=batch_size, model_name=model_name)
-    # keep only cleaned_comment, likes_count, sentiment_score (in that order)
+
+    # ===== Simpan kolom yang relevan, termasuk konteks =====
     keep_cols = []
-    if "cleaned_comment" in df_out.columns:
-        keep_cols.append("cleaned_comment")
-    if "likes_count" in df_out.columns:
-        keep_cols.append("likes_count")
-    keep_cols.append("sentiment_score")
+    for col in ["thread_id", "cleaned_comment", "likes_count", "is_reply",
+            "sentiment_score", "predicted_label"]:
+        if col in df_out.columns:
+            keep_cols.append(col)
+
     df_out = df_out[keep_cols]
     df_out.to_csv(output_path, index=False, encoding="utf-8-sig")
+
     print(f"[DONE] Saved sentiment CSV: {output_path}")
+
 
 
 # Interactive single-sentence inference
@@ -162,3 +167,15 @@ def infer_single_sentence(text, model_name=None):
     print(f"  Probabilities: {probs.tolist()}")
     print(f"  Continuous score (pos-neg): {score:.4f}\n")
     return score
+
+def _label_from_probabilities(probs, labels):
+    """Mengembalikan label human-readable ('positive','neutral','negative')."""
+    dominant_idx = int(np.argmax(probs))
+    
+    label_key = labels[dominant_idx]  # ex: "LABEL_0"
+    label_map_human = {
+        "LABEL_0": "positive",
+        "LABEL_1": "neutral",
+        "LABEL_2": "negative"
+    }
+    return label_map_human.get(label_key, "unknown")

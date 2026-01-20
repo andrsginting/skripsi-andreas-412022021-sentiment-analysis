@@ -1,0 +1,47 @@
+
+COMMENT-LEVEL SENTIMENT ANALYSIS REPORT (KESELURUHAN)
+======================================================================
+
+Analysis Date: 2026-01-16 19:58:02
+Total Experiments Analyzed: 3
+Total Comments Analyzed: 18384
+
+SENTIMENT DISTRIBUTION (GLOBAL):
+----------------------------------------------------------------------
+
+NEGATIF:
+  Count: 9693
+  Percentage: 52.73%
+
+NETRAL:
+  Count: 3075
+  Percentage: 16.73%
+
+POSITIF:
+  Count: 5616
+  Percentage: 30.55%
+
+======================================================================
+
+EXPERIMENT BREAKDOWN:
+----------------------------------------------------------------------
+
+60_main_sentiment:
+  Total Comments: 6128
+    negatif: 3231 (52.73%)
+    netral: 1025 (16.73%)
+    positif: 1872 (30.55%)
+
+70_main_sentiment:
+  Total Comments: 6128
+    negatif: 3231 (52.73%)
+    netral: 1025 (16.73%)
+    positif: 1872 (30.55%)
+
+80_main_sentiment:
+  Total Comments: 6128
+    negatif: 3231 (52.73%)
+    netral: 1025 (16.73%)
+    positif: 1872 (30.55%)
+
+======================================================================

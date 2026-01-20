@@ -1,0 +1,16 @@
+======================================================================
+CONFUSION MATRIX SUMMARY
+======================================================================
+
+Total Samples: 8987
+Label Order: ['positif', 'netral', 'negatif']
+
+OVERALL CONFUSION MATRIX (Count):
+[[1961  366  312]
+ [ 221  573  433]
+ [ 335  740 4046]]
+
+OVERALL CONFUSION MATRIX (Normalized %):
+[[74.31 13.87 11.82]
+ [18.01 46.7  35.29]
+ [ 6.54 14.45 79.01]]
